@@ -109,7 +109,9 @@
     </div>
     <audio ref="{{ countdownAudioRef }}" src="audio/countdown-sine-wave-beeps.webm" preload="auto" playsinline style="display: none;"></audio>
     <audio ref="{{ coinsSoundRef }}" src="audio/coins-drop.webm" loop preload="auto" playsinline style="display: none;"></audio>
-    <audio ref="{{ reelSpinRef }}" src="audio/reel-spin.webm" loop preload="auto" playsinline style="display: none;"></audio>
+    <audio ref="{{ reelSpinRef }}" src="audio/reel-spin.webm" preload="auto" playsinline style="display: none;"></audio>
+    <audio ref="{{ fireworksSoundRef }}" src="audio/fireworks-spin.webm" preload="auto" playsinline style="display: none;"></audio>
+    <audio ref="{{ winningSoundRef }}" src="audio/winning.webm" preload="auto" playsinline style="display: none;"></audio>
 
     <div class="jw-gradient-overlay" style="position: absolute; left: 0; top: 0; width: 393px; height: 861px; background: rgba(0,0,0,0.9);"></div>
 
@@ -290,7 +292,7 @@
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:393,&quot;height&quot;:852},&quot;winningTier&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Mini Jackpot&quot;,&quot;Minor Jackpot&quot;,&quot;Major Jackpot&quot;,&quot;Mega Jackpot&quot;],&quot;default&quot;:&quot;Mega Jackpot&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Outcome&quot;},&quot;stopStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Clean&quot;,&quot;Near-miss&quot;,&quot;Slow-motion tick&quot;],&quot;default&quot;:&quot;Clean&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Motion&quot;},&quot;spinDuration&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:3200,&quot;max&quot;:9000,&quot;step&quot;:200,&quot;default&quot;:5400,&quot;unit&quot;:&quot;ms&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Motion&quot;},&quot;autoSpin&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Outcome&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:393,&quot;height&quot;:852},&quot;winningTier&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Mini Jackpot&quot;,&quot;Minor Jackpot&quot;,&quot;Major Jackpot&quot;,&quot;Mega Jackpot&quot;],&quot;default&quot;:&quot;Mega Jackpot&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Outcome&quot;},&quot;stopStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Clean&quot;,&quot;Near-miss&quot;,&quot;Slow-motion tick&quot;],&quot;default&quot;:&quot;Near-miss&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Motion&quot;},&quot;spinDuration&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:3200,&quot;max&quot;:9000,&quot;step&quot;:200,&quot;default&quot;:7800,&quot;unit&quot;:&quot;ms&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Motion&quot;},&quot;autoSpin&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Outcome&quot;}}">
 const SECTOR_WIDTH = 22.5;
 const SECTORS = [
   { key: "mini" }, { key: "mega" }, { key: "mini" }, { key: "nowin" },
@@ -324,6 +326,8 @@ class Component extends DCLogic {
   coinRainRef = React.createRef();
   coinsSoundRef = React.createRef();
   reelSpinRef = React.createRef();
+  fireworksSoundRef = React.createRef();
+  winningSoundRef = React.createRef();
   winLogoRef = React.createRef();
   brandLogoRef = React.createRef();
   embersRef = React.createRef();
@@ -333,8 +337,8 @@ class Component extends DCLogic {
   winCaptionRef = React.createRef();
   dismissBtnRef = React.createRef();
   muteBtnRef = React.createRef();
-  state = { muted: true };
-  musicMuted = true;
+  state = { muted: false };
+  musicMuted = false;
   grandRowRef = React.createRef();
   pillMajorRef = React.createRef();
   pillMinorRef = React.createRef();
@@ -430,7 +434,7 @@ class Component extends DCLogic {
       "assets/coin0.png", "assets/coin1.png", "assets/coin2.png", "assets/coin3.png",
       "assets/coin5.png", "assets/coin6.png", "assets/coin7.png", "assets/coin8.png", "assets/coin9.png", "assets/coin10.png"
     ];
-    const audios = ["audio/countdown-sine-wave-beeps.webm", "audio/coins-drop.webm", "audio/reel-spin.webm"];
+    const audios = ["audio/countdown-sine-wave-beeps.webm", "audio/coins-drop.webm", "audio/reel-spin.webm", "audio/fireworks-spin.webm", "audio/winning.webm"];
     const total = images.length + audios.length;
     let loaded = 0;
     const bump = () => {
@@ -467,6 +471,9 @@ class Component extends DCLogic {
     cancelAnimationFrame(this.raf);
     clearTimeout(this.autoTimer);
     clearTimeout(this.flameFadeTimer);
+    clearTimeout(this.fireworksFadeTimer);
+    clearInterval(this.fireworksFadeInterval);
+    clearTimeout(this.ratchetTimer);
     clearInterval(this.flameFlickerTimer);
     clearTimeout(this.exitTimer);
     clearTimeout(this.burstTimer);
@@ -475,6 +482,8 @@ class Component extends DCLogic {
     clearInterval(this.coinRainInterval);
     clearTimeout(this.coinsSoundTimer);
     this.stopReelSpinSound();
+    this.stopFireworksSound();
+    this.stopWinningSound();
     clearInterval(this.countdownTimer);
     window.removeEventListener("pointerdown", this.unlockAudio);
     window.removeEventListener("resize", this.rescale);
@@ -493,6 +502,9 @@ class Component extends DCLogic {
 
   applyIdle() {
     clearTimeout(this.flameFadeTimer);
+    clearTimeout(this.fireworksFadeTimer);
+    clearInterval(this.fireworksFadeInterval);
+    clearTimeout(this.ratchetTimer);
     clearTimeout(this.exitTimer);
     this._flameFading = false;
     if (this.wheelExitRef.current) {
@@ -508,6 +520,8 @@ class Component extends DCLogic {
       this.dismissBtnRef.current.style.pointerEvents = "none";
     }
     this.stopReelSpinSound();
+    this.stopFireworksSound();
+    this.stopWinningSound();
     clearInterval(this.countdownTimer);
     clearTimeout(this.winLoopTimer);
     this.stopCountdownSound();
@@ -538,6 +552,7 @@ class Component extends DCLogic {
     if (this.pointerWrapRef.current) {
       this.pointerWrapRef.current.style.transition = "opacity 320ms cubic-bezier(0.2,0,0,1)";
       this.pointerWrapRef.current.style.opacity = "1";
+      this.pointerWrapRef.current.style.transform = "scale(1) rotate(0deg)";
     }
     this.setGroup(true);
     this.clearHighlights();
@@ -703,19 +718,77 @@ class Component extends DCLogic {
   playReelSpinSound() {
     const el = this.reelSpinRef.current;
     if (!el || this.musicMuted) return;
-    el.loop = true;
-    el.volume = 0.7;
+    el.loop = false;
+    const target = 0.7;
+    el.volume = 0;
     el.currentTime = 0;
     el.play().catch(() => {});
+    clearInterval(this.ratchetFadeInterval);
+    const steps = 16;
+    const stepMs = 600 / steps;
+    let i = 0;
+    this.ratchetFadeInterval = setInterval(() => {
+      i++;
+      el.volume = Math.min(target, (target * i) / steps);
+      if (i >= steps) clearInterval(this.ratchetFadeInterval);
+    }, stepMs);
   }
 
   stopReelSpinSound() {
+    clearInterval(this.ratchetFadeInterval);
     const el = this.reelSpinRef.current;
     if (el) { el.pause(); el.currentTime = 0; }
   }
 
+  playFireworksSound() {
+    const el = this.fireworksSoundRef.current;
+    if (!el || this.musicMuted) return;
+    el.volume = 0.55;
+    el.currentTime = 0;
+    el.play().catch(() => {});
+  }
+
+  stopFireworksSound() {
+    clearInterval(this.fireworksFadeInterval);
+    const el = this.fireworksSoundRef.current;
+    if (el) { el.pause(); el.currentTime = 0; el.volume = 0.55; }
+  }
+
+  playWinningSound() {
+    const el = this.winningSoundRef.current;
+    if (!el || this.musicMuted) return;
+    el.volume = 0.8;
+    el.currentTime = 0;
+    el.play().catch(() => {});
+  }
+
+  stopWinningSound() {
+    const el = this.winningSoundRef.current;
+    if (el) { el.pause(); el.currentTime = 0; }
+  }
+
+  fadeOutFireworksSound(duration) {
+    const el = this.fireworksSoundRef.current;
+    if (!el || el.paused) return;
+    clearInterval(this.fireworksFadeInterval);
+    const startVol = el.volume;
+    const steps = 20;
+    const stepMs = duration / steps;
+    let i = 0;
+    this.fireworksFadeInterval = setInterval(() => {
+      i++;
+      el.volume = Math.max(0, startVol * (1 - i / steps));
+      if (i >= steps) {
+        clearInterval(this.fireworksFadeInterval);
+        el.pause();
+        el.currentTime = 0;
+        el.volume = startVol;
+      }
+    }, stepMs);
+  }
+
   unlockAllAudio() {
-    [this.coinsSoundRef, this.reelSpinRef, this.countdownAudioRef].forEach(ref => {
+    [this.coinsSoundRef, this.reelSpinRef, this.countdownAudioRef, this.fireworksSoundRef, this.winningSoundRef].forEach(ref => {
       const el = ref.current;
       if (!el) return;
       const prevVolume = el.volume;
@@ -763,7 +836,6 @@ class Component extends DCLogic {
   }
 
   playCountdownSound() {
-    if (true) return;
     const el = this.countdownAudioRef.current;
     if (!el || this.musicMuted) return;
     el.volume = 0.8;
@@ -795,6 +867,7 @@ class Component extends DCLogic {
       n -= 1;
       if (n <= 0) {
         clearInterval(this.countdownTimer);
+        this.stopCountdownSound();
         if (this.countdownRef.current) this.countdownRef.current.style.opacity = "0";
         this.runSpin();
         return;
@@ -828,10 +901,10 @@ class Component extends DCLogic {
     const tUp = 520;
     const tSettle = 620;
     const rest = total - tUp - tSettle;
-    const tCruise = Math.round(rest * 0.34);
+    const tCruise = Math.round(rest * 0.15);
     const tDecel = rest - tCruise;
-    const tail = style === "Slow-motion tick" ? 64 : style === "Near-miss" ? SECTOR_WIDTH * 3 + 6 : 0;
-    const tTail = tail === 0 ? 0 : Math.round(tDecel * (style === "Slow-motion tick" ? 0.4 : 0.26));
+    const tail = style === "Slow-motion tick" ? 64 : 0;
+    const tTail = tail === 0 ? 0 : Math.round(tDecel * 0.4);
     const tMain = tDecel - tTail;
 
     const start = IDLE_ROT;
@@ -844,17 +917,42 @@ class Component extends DCLogic {
     const aDecel = (totalAngle - start) - aUp - aCruise;
     const aMain = Math.max(120, aDecel - tail);
 
-    this.segs = [
-      { d: tUp,     a: aUp,     from: start,                     e: p => p * p },
-      { d: tCruise, a: aCruise, from: start + aUp,                e: p => p },
-      { d: tMain,   a: aMain,   from: start + aUp + aCruise,      e: p => 1 - Math.pow(1 - p, 2.2) },
-      { d: tTail,   a: tail,    from: start + aUp + aCruise + aMain, e: p => 1 - Math.pow(1 - p, 1.5) },
-      { d: tSettle, a: 0,       from: totalAngle,                e: p => p, wobble: true }
-    ].filter(s => s.d > 0);
+    this._snapAt = null;
+    this._snapFired = false;
+
+    if (style === "Near-miss") {
+      const nearMissAngle = totalAngle - SECTOR_WIDTH;
+      const aMainNM = Math.max(120, (nearMissAngle - start) - aUp - aCruise);
+      const tHold = Math.min(900, Math.round(tDecel * 0.22));
+      const tSnap = 220;
+      const tMainNM = Math.max(300, tDecel - tHold - tSnap);
+      const snapFrom = start + aUp + aCruise + aMainNM;
+      this.segs = [
+        { d: tUp,     a: aUp,    from: start,                e: p => p * p },
+        { d: tCruise, a: aCruise, from: start + aUp,          e: p => p },
+        { d: tMainNM, a: aMainNM, from: start + aUp + aCruise, e: p => 1 - Math.pow(1 - p, 3.4) },
+        { d: tHold,   a: 0,       from: snapFrom,              e: p => p, wobble: true, wobbleAmp: 1.4, wobbleFreq: 46, wobbleDecay: 260 },
+        { d: tSnap,   a: SECTOR_WIDTH, from: snapFrom,         e: p => 1 - Math.pow(1 - p, 3.2), snap: true },
+        { d: tSettle, a: 0,       from: totalAngle,            e: p => p, wobble: true }
+      ].filter(s => s.d > 0);
+      this._snapAt = tUp + tCruise + tMainNM + tHold;
+      this._ratchetAt = Math.max(0, total - 8148);
+    } else {
+      this.segs = [
+        { d: tUp,     a: aUp,     from: start,                     e: p => p * p },
+        { d: tCruise, a: aCruise, from: start + aUp,                e: p => p },
+        { d: tMain,   a: aMain,   from: start + aUp + aCruise,      e: p => 1 - Math.pow(1 - p, 3) },
+        { d: tTail,   a: tail,    from: start + aUp + aCruise + aMain, e: p => 1 - Math.pow(1 - p, 1.5) },
+        { d: tSettle, a: 0,       from: totalAngle,                e: p => p, wobble: true }
+      ].filter(s => s.d > 0);
+      this._ratchetAt = Math.max(0, total - 8148);
+    }
 
     this.t0 = performance.now();
     this.totalAngle = totalAngle;
-    this.playReelSpinSound();
+    clearTimeout(this.ratchetTimer);
+    this.ratchetTimer = setTimeout(() => this.playReelSpinSound(), Math.max(0, this._ratchetAt));
+    this.playFireworksSound();
     clearTimeout(this.flameFadeTimer);
     this._flameFading = false;
     this.flameFadeTimer = setTimeout(() => {
@@ -862,13 +960,34 @@ class Component extends DCLogic {
       if (this.flameRingRef.current) this.flameRingRef.current.style.opacity = "0";
       if (this.weldSparksRef.current) this.weldSparksRef.current.style.opacity = "0";
     }, Math.max(0, total - 1000));
+    clearTimeout(this.fireworksFadeTimer);
+    const fireworksFadeDur = 1100;
+    this.fireworksFadeTimer = setTimeout(() => {
+      this.fadeOutFireworksSound(fireworksFadeDur);
+    }, Math.max(0, total - fireworksFadeDur));
     cancelAnimationFrame(this.raf);
     this.tick();
+  }
+
+  pointerBump() {
+    const el = this.pointerWrapRef.current;
+    if (!el) return;
+    el.style.transition = "transform 90ms cubic-bezier(0.2,0,0,1)";
+    el.style.transform = "scale(1.16) rotate(-7deg)";
+    setTimeout(() => {
+      if (!el) return;
+      el.style.transition = "transform 260ms cubic-bezier(0.34,1.56,0.64,1)";
+      el.style.transform = "scale(1) rotate(0deg)";
+    }, 90);
   }
 
   tick = () => {
     const now = performance.now();
     let el = now - this.t0;
+    if (this._snapAt != null && !this._snapFired && el >= this._snapAt) {
+      this._snapFired = true;
+      this.pointerBump();
+    }
     let angle = this.totalAngle;
     let omega = 0;
     let done = true;
@@ -878,7 +997,10 @@ class Component extends DCLogic {
       if (el < s.d) {
         const p = el / s.d;
         if (s.wobble) {
-          angle = this.totalAngle + 4.2 * Math.exp(-el / 150) * Math.cos(el / 52);
+          const amp = s.wobbleAmp != null ? s.wobbleAmp : 4.2;
+          const freq = s.wobbleFreq != null ? s.wobbleFreq : 52;
+          const decay = s.wobbleDecay != null ? s.wobbleDecay : 150;
+          angle = s.from + amp * Math.exp(-el / decay) * Math.cos(el / freq);
           omega = 0;
         } else {
           angle = s.from + s.a * s.e(p);
@@ -935,6 +1057,8 @@ class Component extends DCLogic {
   land() {
     this.phase = "result";
     this.stopReelSpinSound();
+    this.stopFireworksSound();
+    this.playWinningSound();
     if (this.ringRef.current) {
       this.ringRef.current.style.transform = "rotate(" + this.totalAngle + "deg)";
       this.ringRef.current.style.filter = "none";
@@ -1017,21 +1141,29 @@ class Component extends DCLogic {
       coinRainRef: this.coinRainRef,
       coinsSoundRef: this.coinsSoundRef,
       reelSpinRef: this.reelSpinRef,
+      fireworksSoundRef: this.fireworksSoundRef,
+      winningSoundRef: this.winningSoundRef,
       embersRef: this.embersRef,
       pointerWrapRef: this.pointerWrapRef,
       wheelGroupRef: this.wheelGroupRef,
       wheelExitRef: this.wheelExitRef,
       winCaptionRef: this.winCaptionRef,
       dismissBtnRef: this.dismissBtnRef,
-      onDismiss: () => { if (typeof this.props.onDismiss === "function") this.props.onDismiss(); },
+      onDismiss: () => {
+        if (typeof this.props.onDismiss === "function") this.props.onDismiss();
+        if (typeof window.__jwOnDismiss === "function") window.__jwOnDismiss();
+      },
       muteBtnRef: this.muteBtnRef,
       toggleMute: () => {
         this.musicMuted = !this.musicMuted;
         if (this.musicMuted) {
           if (this.reelSpinRef.current) this.reelSpinRef.current.pause();
           if (this.coinsSoundRef.current) this.coinsSoundRef.current.pause();
+          if (this.fireworksSoundRef.current) this.fireworksSoundRef.current.pause();
+          if (this.winningSoundRef.current) this.winningSoundRef.current.pause();
         } else if (this.phase === "spinning") {
           this.playReelSpinSound();
+          this.playFireworksSound();
         }
         this.setState({ muted: this.musicMuted });
       },

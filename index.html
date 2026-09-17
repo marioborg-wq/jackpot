@@ -318,7 +318,7 @@
 
     <sc-if value="{{ wheelVisible }}" hint-placeholder-val="{{ false }}">
       <div style="position: absolute; inset: 0; z-index: 40;">
-        <dc-import name="Wheel Overlay" hint-size="393px,852px" style="position: absolute; inset: 0;"></dc-import>
+        <dc-import name="Wheel Overlay" on-dismiss="{{ closeWheel }}" hint-size="393px,852px" style="position: absolute; inset: 0;"></dc-import>
       </div>
     </sc-if>
 
@@ -373,6 +373,7 @@ class Component extends DCLogic {
     this.scheduleTick();
     window.addEventListener("pointerdown", () => { window.__jwAudioUnlocked = true; }, { once: true });
     this._wheelTimer = setTimeout(() => this.setState({ wheelVisible: true }), 40000);
+    window.__jwOnDismiss = () => this.setState({ wheelVisible: false });
   }
 
   tierDuration = (key) => key === 'fire' ? 8000 : 5000;
