@@ -113,6 +113,13 @@
     <audio ref="{{ fireworksSoundRef }}" src="audio/fireworks-spin.webm" preload="auto" playsinline style="display: none;"></audio>
     <audio ref="{{ winningSoundRef }}" src="audio/winning.webm" preload="auto" playsinline style="display: none;"></audio>
 
+    <button ref="{{ tapPromptRef }}" onClick="{{ onTapToStart }}" style="position: absolute; inset: 0; z-index: 19; background: rgba(0,0,0,0.55); border: none; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer; opacity: 0; transition: opacity 320ms ease;">
+      <span style="width: 64px; height: 64px; border-radius: 50%; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="#FFFFFF"><path d="M8 5v14l11-7z"></path></svg>
+      </span>
+      <span style="font-family: Inter, sans-serif; font-weight: 600; font-size: 14px; color: #FFFFFF;">Tap to start with sound</span>
+    </button>
+
     <div class="jw-gradient-overlay" style="position: absolute; left: 0; top: 0; width: 393px; height: 861px; background: rgba(0,0,0,0.9);"></div>
 
     <div ref="{{ topContentRef }}" style="transition: opacity 260ms cubic-bezier(0.2,0,0,1);">
@@ -350,6 +357,7 @@ class Component extends DCLogic {
   preloaderRef = React.createRef();
   preloaderTextRef = React.createRef();
   countdownAudioRef = React.createRef();
+  tapPromptRef = React.createRef();
 
   randomSpin = () => {
     if (!this.assetsReady || this.phase === "spinning" || this.phase === "countdown") return;
@@ -397,19 +405,41 @@ class Component extends DCLogic {
     this.assetsReady = false;
     this.preloadAssets(() => {
       this.assetsReady = true;
+      this.unlockAudio = () => { this.unlockAllAudio(); };
       if (window.__jwAudioUnlocked) {
         this.unlockAllAudio();
+        this.scheduleAutoSpin();
+      } else {
+        window.addEventListener("pointerdown", this.unlockAudio, { once: true });
+        this.showTapPrompt();
       }
-      this.unlockAudio = () => { this.unlockAllAudio(); };
-      window.addEventListener("pointerdown", this.unlockAudio, { once: true });
-      const elapsed = performance.now() - this.mountTime;
-      this.autoTimer = setTimeout(() => {
-        if (this._manualOverride) return;
-        this.randomSpin();
-      }, Math.max(0, 4000 - elapsed));
     });
     window.__jwWheelInstance = this;
     if (typeof this.props.onReady === "function") this.props.onReady(this);
+  }
+
+  showTapPrompt() {
+    if (this.tapPromptRef.current) {
+      this.tapPromptRef.current.style.display = "flex";
+      requestAnimationFrame(() => {
+        if (this.tapPromptRef.current) this.tapPromptRef.current.style.opacity = "1";
+      });
+    }
+  }
+
+  hideTapPrompt() {
+    const el = this.tapPromptRef.current;
+    if (!el) return;
+    el.style.opacity = "0";
+    setTimeout(() => { el.style.display = "none"; }, 320);
+  }
+
+  scheduleAutoSpin() {
+    const elapsed = performance.now() - this.mountTime;
+    this.autoTimer = setTimeout(() => {
+      if (this._manualOverride) return;
+      this.randomSpin();
+    }, Math.max(0, 4000 - elapsed));
   }
 
   jumpToTier = (key) => {
@@ -1184,7 +1214,15 @@ class Component extends DCLogic {
       countdownNumRef: this.countdownNumRef,
       preloaderRef: this.preloaderRef,
       preloaderTextRef: this.preloaderTextRef,
-      countdownAudioRef: this.countdownAudioRef
+      countdownAudioRef: this.countdownAudioRef,
+      tapPromptRef: this.tapPromptRef,
+      onTapToStart: () => {
+        window.removeEventListener("pointerdown", this.unlockAudio);
+        this.unlockAllAudio();
+        window.__jwAudioUnlocked = true;
+        this.hideTapPrompt();
+        if (!this._manualOverride) this.scheduleAutoSpin();
+      }
     };
   }
 }
