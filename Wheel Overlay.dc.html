@@ -109,10 +109,6 @@
     </div>
     <audio ref="{{ countdownAudioRef }}" src="audio/countdown-sine-wave-beeps.webm" preload="auto" playsinline style="display: none;"></audio>
     <audio ref="{{ coinsSoundRef }}" src="audio/coins-drop.webm" loop preload="auto" playsinline style="display: none;"></audio>
-    <audio ref="{{ reelSpinRef }}" src="audio/reel-spin.webm" preload="auto" playsinline style="display: none;"></audio>
-    <audio ref="{{ fireworksSoundRef }}" src="audio/fireworks-spin.webm" preload="auto" playsinline style="display: none;"></audio>
-    <audio ref="{{ winningSoundRef }}" src="audio/winning.webm" preload="auto" playsinline style="display: none;"></audio>
-
     <button ref="{{ tapPromptRef }}" onClick="{{ onTapToStart }}" style="position: absolute; inset: 0; z-index: 19; background: rgba(0,0,0,0.55); border: none; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer; opacity: 0; transition: opacity 320ms ease;">
       <span style="width: 64px; height: 64px; border-radius: 50%; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center;">
         <svg viewBox="0 0 24 24" width="28" height="28" fill="#FFFFFF"><path d="M8 5v14l11-7z"></path></svg>
@@ -332,9 +328,6 @@ class Component extends DCLogic {
   winTitleRef = React.createRef();
   coinRainRef = React.createRef();
   coinsSoundRef = React.createRef();
-  reelSpinRef = React.createRef();
-  fireworksSoundRef = React.createRef();
-  winningSoundRef = React.createRef();
   winLogoRef = React.createRef();
   brandLogoRef = React.createRef();
   embersRef = React.createRef();
@@ -403,6 +396,8 @@ class Component extends DCLogic {
 
     this.mountTime = performance.now();
     this.assetsReady = false;
+    this.buffers = {};
+    try { this.actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.actx = null; }
     this.preloadAssets(() => {
       this.assetsReady = true;
       this.unlockAudio = () => { this.unlockAllAudio(); };
@@ -464,8 +459,9 @@ class Component extends DCLogic {
       "assets/coin0.png", "assets/coin1.png", "assets/coin2.png", "assets/coin3.png",
       "assets/coin5.png", "assets/coin6.png", "assets/coin7.png", "assets/coin8.png", "assets/coin9.png", "assets/coin10.png"
     ];
-    const audios = ["audio/countdown-sine-wave-beeps.webm", "audio/coins-drop.webm", "audio/reel-spin.webm", "audio/fireworks-spin.webm", "audio/winning.webm"];
-    const total = images.length + audios.length;
+    const audios = ["audio/countdown-sine-wave-beeps.webm", "audio/coins-drop.webm"];
+    const bufferUrls = ["audio/reel-spin.webm", "audio/fireworks-spin.webm", "audio/winning.webm"];
+    const total = images.length + audios.length + bufferUrls.length;
     let loaded = 0;
     const bump = () => {
       loaded++;
@@ -495,6 +491,67 @@ class Component extends DCLogic {
       a.src = src;
       a.load();
     });
+    bufferUrls.forEach(url => {
+      if (!this.actx) { bump(); return; }
+      fetch(url).then(r => r.arrayBuffer()).then(ab => this.actx.decodeAudioData(ab)).then(buf => {
+        this.buffers[url] = buf;
+        bump();
+      }).catch(() => bump());
+    });
+  }
+
+  playBuffer(url, opts) {
+    opts = opts || {};
+    if (!this.actx || !this.buffers[url] || this.musicMuted) return null;
+    if (this.actx.state === "suspended") this.actx.resume();
+    const ctx = this.actx;
+    const gain = opts.gain != null ? opts.gain : 1;
+    const delay = Math.max(0, opts.delay || 0);
+    const fadeIn = opts.fadeIn || 0;
+    const startAt = ctx.currentTime + delay;
+    const src = ctx.createBufferSource();
+    src.buffer = this.buffers[url];
+    const gainNode = ctx.createGain();
+    if (fadeIn > 0) {
+      gainNode.gain.setValueAtTime(0, startAt);
+      gainNode.gain.linearRampToValueAtTime(gain, startAt + fadeIn);
+    } else {
+      gainNode.gain.setValueAtTime(gain, startAt);
+    }
+    src.connect(gainNode).connect(ctx.destination);
+    src.start(startAt);
+    return { src, gainNode, baseGain: gain, startAt };
+  }
+
+  stopVoice(key, fadeSec) {
+    const v = this[key];
+    if (!v) return;
+    try {
+      const ctx = this.actx;
+      if (fadeSec && ctx) {
+        const now = ctx.currentTime;
+        v.gainNode.gain.cancelScheduledValues(now);
+        v.gainNode.gain.setValueAtTime(v.gainNode.gain.value, now);
+        v.gainNode.gain.linearRampToValueAtTime(0, now + fadeSec);
+        v.src.stop(now + fadeSec + 0.02);
+      } else {
+        v.src.stop();
+      }
+    } catch (e) {}
+    this[key] = null;
+  }
+
+  fadeOutVoice(key, durationMs) {
+    const v = this[key];
+    if (!v || !this.actx) return;
+    const ctx = this.actx;
+    const now = ctx.currentTime;
+    const dur = durationMs / 1000;
+    v.gainNode.gain.cancelScheduledValues(now);
+    v.gainNode.gain.setValueAtTime(v.gainNode.gain.value, now);
+    v.gainNode.gain.linearRampToValueAtTime(0, now + dur);
+    try { v.src.stop(now + dur + 0.02); } catch (e) {}
+    this[key] = null;
   }
 
   componentWillUnmount() {
@@ -502,8 +559,6 @@ class Component extends DCLogic {
     clearTimeout(this.autoTimer);
     clearTimeout(this.flameFadeTimer);
     clearTimeout(this.fireworksFadeTimer);
-    clearInterval(this.fireworksFadeInterval);
-    clearTimeout(this.ratchetTimer);
     clearInterval(this.flameFlickerTimer);
     clearTimeout(this.exitTimer);
     clearTimeout(this.burstTimer);
@@ -533,8 +588,6 @@ class Component extends DCLogic {
   applyIdle() {
     clearTimeout(this.flameFadeTimer);
     clearTimeout(this.fireworksFadeTimer);
-    clearInterval(this.fireworksFadeInterval);
-    clearTimeout(this.ratchetTimer);
     clearTimeout(this.exitTimer);
     this._flameFading = false;
     if (this.wheelExitRef.current) {
@@ -746,79 +799,39 @@ class Component extends DCLogic {
   }
 
   playReelSpinSound() {
-    const el = this.reelSpinRef.current;
-    if (!el || this.musicMuted) return;
-    el.loop = false;
-    const target = 0.7;
-    el.volume = 0;
-    el.currentTime = 0;
-    el.play().catch(() => {});
-    clearInterval(this.ratchetFadeInterval);
-    const steps = 16;
-    const stepMs = 600 / steps;
-    let i = 0;
-    this.ratchetFadeInterval = setInterval(() => {
-      i++;
-      el.volume = Math.min(target, (target * i) / steps);
-      if (i >= steps) clearInterval(this.ratchetFadeInterval);
-    }, stepMs);
+    this.stopVoice("ratchetVoice");
+    this.ratchetVoice = this.playBuffer("audio/reel-spin.webm", { gain: 0.7, fadeIn: 0.6 });
   }
 
   stopReelSpinSound() {
-    clearInterval(this.ratchetFadeInterval);
-    const el = this.reelSpinRef.current;
-    if (el) { el.pause(); el.currentTime = 0; }
+    this.stopVoice("ratchetVoice");
   }
 
   playFireworksSound() {
-    const el = this.fireworksSoundRef.current;
-    if (!el || this.musicMuted) return;
-    el.volume = 0.55;
-    el.currentTime = 0;
-    el.play().catch(() => {});
+    this.stopVoice("fireworksVoice");
+    this.fireworksVoice = this.playBuffer("audio/fireworks-spin.webm", { gain: 0.55 });
   }
 
   stopFireworksSound() {
-    clearInterval(this.fireworksFadeInterval);
-    const el = this.fireworksSoundRef.current;
-    if (el) { el.pause(); el.currentTime = 0; el.volume = 0.55; }
+    this.stopVoice("fireworksVoice");
   }
 
   playWinningSound() {
-    const el = this.winningSoundRef.current;
-    if (!el || this.musicMuted) return;
-    el.volume = 0.8;
-    el.currentTime = 0;
-    el.play().catch(() => {});
+    this.stopVoice("winningVoice");
+    this.winningVoice = this.playBuffer("audio/winning.webm", { gain: 0.8 });
   }
 
   stopWinningSound() {
-    const el = this.winningSoundRef.current;
-    if (el) { el.pause(); el.currentTime = 0; }
+    this.stopVoice("winningVoice");
   }
 
   fadeOutFireworksSound(duration) {
-    const el = this.fireworksSoundRef.current;
-    if (!el || el.paused) return;
-    clearInterval(this.fireworksFadeInterval);
-    const startVol = el.volume;
-    const steps = 20;
-    const stepMs = duration / steps;
-    let i = 0;
-    this.fireworksFadeInterval = setInterval(() => {
-      i++;
-      el.volume = Math.max(0, startVol * (1 - i / steps));
-      if (i >= steps) {
-        clearInterval(this.fireworksFadeInterval);
-        el.pause();
-        el.currentTime = 0;
-        el.volume = startVol;
-      }
-    }, stepMs);
+    this.fadeOutVoice("fireworksVoice", duration);
   }
 
   unlockAllAudio() {
-    [this.coinsSoundRef, this.reelSpinRef, this.countdownAudioRef, this.fireworksSoundRef, this.winningSoundRef].forEach(ref => {
+    if (this.actx && this.actx.state === "suspended") this.actx.resume();
+    [this.coinsSoundRef, this.countdownAudioRef].forEach(ref => {
       const el = ref.current;
       if (!el) return;
       const prevVolume = el.volume;
@@ -980,9 +993,11 @@ class Component extends DCLogic {
 
     this.t0 = performance.now();
     this.totalAngle = totalAngle;
-    clearTimeout(this.ratchetTimer);
-    this.ratchetTimer = setTimeout(() => this.playReelSpinSound(), Math.max(0, this._ratchetAt));
-    this.playFireworksSound();
+    this.audioT0 = this.actx ? this.actx.currentTime : null;
+    this.stopVoice("ratchetVoice");
+    this.ratchetVoice = this.playBuffer("audio/reel-spin.webm", { gain: 0.7, delay: this._ratchetAt / 1000, fadeIn: 0.6 });
+    this.stopVoice("fireworksVoice");
+    this.fireworksVoice = this.playBuffer("audio/fireworks-spin.webm", { gain: 0.55 });
     clearTimeout(this.flameFadeTimer);
     this._flameFading = false;
     this.flameFadeTimer = setTimeout(() => {
@@ -1170,9 +1185,6 @@ class Component extends DCLogic {
       brandLogoRef: this.brandLogoRef,
       coinRainRef: this.coinRainRef,
       coinsSoundRef: this.coinsSoundRef,
-      reelSpinRef: this.reelSpinRef,
-      fireworksSoundRef: this.fireworksSoundRef,
-      winningSoundRef: this.winningSoundRef,
       embersRef: this.embersRef,
       pointerWrapRef: this.pointerWrapRef,
       wheelGroupRef: this.wheelGroupRef,
@@ -1186,14 +1198,18 @@ class Component extends DCLogic {
       muteBtnRef: this.muteBtnRef,
       toggleMute: () => {
         this.musicMuted = !this.musicMuted;
+        const mutedGain = (key, base) => {
+          const v = this[key];
+          if (v) v.gainNode.gain.value = this.musicMuted ? 0 : base;
+        };
         if (this.musicMuted) {
-          if (this.reelSpinRef.current) this.reelSpinRef.current.pause();
           if (this.coinsSoundRef.current) this.coinsSoundRef.current.pause();
-          if (this.fireworksSoundRef.current) this.fireworksSoundRef.current.pause();
-          if (this.winningSoundRef.current) this.winningSoundRef.current.pause();
+          mutedGain("ratchetVoice", 0.7);
+          mutedGain("fireworksVoice", 0.55);
+          mutedGain("winningVoice", 0.8);
         } else if (this.phase === "spinning") {
-          this.playReelSpinSound();
-          this.playFireworksSound();
+          mutedGain("ratchetVoice", 0.7);
+          mutedGain("fireworksVoice", 0.55);
         }
         this.setState({ muted: this.musicMuted });
       },
