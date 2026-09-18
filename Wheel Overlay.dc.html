@@ -295,7 +295,7 @@
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:393,&quot;height&quot;:852},&quot;winningTier&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Mini Jackpot&quot;,&quot;Minor Jackpot&quot;,&quot;Major Jackpot&quot;,&quot;Mega Jackpot&quot;],&quot;default&quot;:&quot;Mega Jackpot&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Outcome&quot;},&quot;stopStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Clean&quot;,&quot;Near-miss&quot;,&quot;Slow-motion tick&quot;],&quot;default&quot;:&quot;Near-miss&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Motion&quot;},&quot;spinDuration&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:3200,&quot;max&quot;:9000,&quot;step&quot;:200,&quot;default&quot;:7800,&quot;unit&quot;:&quot;ms&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Motion&quot;},&quot;autoSpin&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Outcome&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:393,&quot;height&quot;:852},&quot;winningTier&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Mini Jackpot&quot;,&quot;Minor Jackpot&quot;,&quot;Major Jackpot&quot;,&quot;Mega Jackpot&quot;],&quot;default&quot;:&quot;Mega Jackpot&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Outcome&quot;},&quot;stopStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Clean&quot;,&quot;Near-miss&quot;,&quot;Slow-motion tick&quot;],&quot;default&quot;:&quot;Near-miss&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Motion&quot;},&quot;spinDuration&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:8000,&quot;max&quot;:20000,&quot;step&quot;:200,&quot;default&quot;:16533,&quot;unit&quot;:&quot;ms&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Motion&quot;},&quot;autoSpin&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Outcome&quot;}}">
 const SECTOR_WIDTH = 22.5;
 const SECTORS = [
   { key: "mini" }, { key: "mega" }, { key: "mini" }, { key: "nowin" },
@@ -460,7 +460,7 @@ class Component extends DCLogic {
       "assets/coin5.png", "assets/coin6.png", "assets/coin7.png", "assets/coin8.png", "assets/coin9.png", "assets/coin10.png"
     ];
     const audios = ["audio/countdown-sine-wave-beeps.webm", "audio/coins-drop.webm"];
-    const bufferUrls = ["audio/reel-spin.webm", "audio/fireworks-spin.webm", "audio/winning.webm"];
+    const bufferUrls = ["audio/casino-wheel-spin.webm", "audio/fireworks-spin.webm", "audio/winning.webm"];
     const total = images.length + audios.length + bufferUrls.length;
     let loaded = 0;
     const bump = () => {
@@ -800,7 +800,7 @@ class Component extends DCLogic {
 
   playReelSpinSound() {
     this.stopVoice("ratchetVoice");
-    this.ratchetVoice = this.playBuffer("audio/reel-spin.webm", { gain: 0.7, fadeIn: 0.6 });
+    this.ratchetVoice = this.playBuffer("audio/casino-wheel-spin.webm", { gain: 0.7, fadeIn: 0.6 });
   }
 
   stopReelSpinSound() {
@@ -809,7 +809,7 @@ class Component extends DCLogic {
 
   playFireworksSound() {
     this.stopVoice("fireworksVoice");
-    this.fireworksVoice = this.playBuffer("audio/fireworks-spin.webm", { gain: 0.55 });
+    this.fireworksVoice = this.playBuffer("audio/fireworks-spin.webm", { gain: 0.75 });
   }
 
   stopFireworksSound() {
@@ -938,7 +938,7 @@ class Component extends DCLogic {
     this.labelEls().forEach(el => { el.style.transition = "opacity 300ms cubic-bezier(0.2,0,0,1)"; el.style.opacity = "1"; });
 
     const style = this.props.stopStyle || "Clean";
-    const total = Math.max(3200, Number(this.props.spinDuration) || 10000);
+    const total = Math.max(3200, Number(this.props.spinDuration) || 16533);
     clearTimeout(this.winLoopTimer);
     const wMax = 1280;
     const tUp = 520;
@@ -979,7 +979,7 @@ class Component extends DCLogic {
         { d: tSettle, a: 0,       from: totalAngle,            e: p => p, wobble: true }
       ].filter(s => s.d > 0);
       this._snapAt = tUp + tCruise + tMainNM + tHold;
-      this._ratchetAt = Math.max(0, total - 8148);
+      this._ratchetAt = Math.max(0, total - 16533);
     } else {
       this.segs = [
         { d: tUp,     a: aUp,     from: start,                     e: p => p * p },
@@ -988,16 +988,16 @@ class Component extends DCLogic {
         { d: tTail,   a: tail,    from: start + aUp + aCruise + aMain, e: p => 1 - Math.pow(1 - p, 1.5) },
         { d: tSettle, a: 0,       from: totalAngle,                e: p => p, wobble: true }
       ].filter(s => s.d > 0);
-      this._ratchetAt = Math.max(0, total - 8148);
+      this._ratchetAt = Math.max(0, total - 16533);
     }
 
     this.t0 = performance.now();
     this.totalAngle = totalAngle;
     this.audioT0 = this.actx ? this.actx.currentTime : null;
     this.stopVoice("ratchetVoice");
-    this.ratchetVoice = this.playBuffer("audio/reel-spin.webm", { gain: 0.7, delay: this._ratchetAt / 1000, fadeIn: 0.6 });
+    this.ratchetVoice = this.playBuffer("audio/casino-wheel-spin.webm", { gain: 0.7, delay: this._ratchetAt / 1000, fadeIn: 0.6 });
     this.stopVoice("fireworksVoice");
-    this.fireworksVoice = this.playBuffer("audio/fireworks-spin.webm", { gain: 0.55 });
+    this.fireworksVoice = this.playBuffer("audio/fireworks-spin.webm", { gain: 0.75 });
     clearTimeout(this.flameFadeTimer);
     this._flameFading = false;
     this.flameFadeTimer = setTimeout(() => {
@@ -1205,11 +1205,11 @@ class Component extends DCLogic {
         if (this.musicMuted) {
           if (this.coinsSoundRef.current) this.coinsSoundRef.current.pause();
           mutedGain("ratchetVoice", 0.7);
-          mutedGain("fireworksVoice", 0.55);
+          mutedGain("fireworksVoice", 0.75);
           mutedGain("winningVoice", 0.8);
         } else if (this.phase === "spinning") {
           mutedGain("ratchetVoice", 0.7);
-          mutedGain("fireworksVoice", 0.55);
+          mutedGain("fireworksVoice", 0.75);
         }
         this.setState({ muted: this.musicMuted });
       },
